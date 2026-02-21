@@ -3,11 +3,10 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * 💋 THEA'S GRAPH-SYNC ENGINE v19.0 (Bidirectional Linking)
- * 「數據交織，靈魂互通。」
- * 
- * 1. 角色百科 -> 連結至所屬任務詳情。
- * 2. 任務詳情 -> 自動列出並連結至該任務出現的所有角色。
+ * 💋 THEA'S GRAPH-SYNC ENGINE v19.1 (Clean Layout)
+ * 1. 任務詳情頁格式修正：
+ *    - 登場角色作為獨立區塊，位於「參考資料」上方。
+ *    - 嚴格遵循官方優先順序。
  */
 
 const SPREADSHEET_ID = '1kRPdI6caisjZuHJGmCjB3kHBveR2RVAeTJoyCmqOZVs';
@@ -35,7 +34,6 @@ const formatText = (text) => {
     return text.split('\n').map(line => line.trim()).filter(line => line !== "").join('\n\n'); 
 };
 
-// 角色頁面中的任務連結化 (跳三層)
 const linkifyMissionsForChar = (missionsStr) => {
     if (!missionsStr || missionsStr.trim() === "" || missionsStr.includes("(尚未有經查證")) return "(尚未有經查證的登場紀錄)";
     return missionsStr.split(/[、,，\n]/).map(m => {
@@ -46,10 +44,9 @@ const linkifyMissionsForChar = (missionsStr) => {
 };
 
 async function syncAll() {
-    console.log("🚀 啟動圖形關聯同步引擎 (v19.0)...");
+    console.log("🚀 啟動圖形關聯同步引擎 (v19.1)...");
     const sheets = await getSheetsClient();
 
-    // 1. 讀取所有基礎數據
     const mapsData = JSON.parse(fs.readFileSync(MAPS_DATA_PATH, 'utf8'));
     const mapTable = Object.fromEntries(mapsData.map(m => [m.id, m.name]));
     
@@ -63,20 +60,18 @@ async function syncAll() {
     const chapterRows = chapterRes.data.values || [];
     const refTable = Object.fromEntries((refRes.data.values || []).map(r => [r[0], { text: r[2], url: r[3] }]));
 
-    // 2. 建立圖形關聯映射：Mission -> [Characters]
     const missionToChars = new Map();
     charRows.forEach(row => {
-        const [isDone, id, faction, nameZh, nameEn, species, brief, background, missionsStr] = row;
+        const nameZh = row[3];
+        const missionsStr = row[8];
         if (!nameZh) return;
-        
         const missions = (missionsStr || "").split(/[、,，\n]/).map(m => m.trim()).filter(m => m);
         missions.forEach(mName => {
             if (!missionToChars.has(mName)) missionToChars.set(mName, []);
-            missionToChars.get(mName).push({ name: nameZh, brief });
+            missionToChars.get(mName).push(nameZh);
         });
     });
 
-    // 3. 映射任務至章節：Chapter -> [Missions]
     const missionsInChapter = new Map();
     missionRows.forEach(row => {
         const chapterCode = row[3];
@@ -89,8 +84,10 @@ async function syncAll() {
         });
     });
 
-    // 4. 同步角色 Markdown
-    console.log("正在同步角色系統...");
+    const factionDirMap = { 'royal': 'royal', 'skydow': 'skydow', 'third': 'third' };
+    const seasonDirMap = { '第一部 - 曙光乍現': 'seasons1', '第二部 - 屠魔英雄': 'seasons2' };
+
+    // 同步角色 MD
     const charIndexList = [];
     charRows.forEach(row => {
         const [isDone, id, faction, nameZh, nameEn, species, brief, background, missionsStr, refIndices] = row;
@@ -106,14 +103,7 @@ async function syncAll() {
         charIndexList.push({ id: nameZh, name: nameZh, faction, brief });
     });
 
-    // 5. 重建角色索引頁 (略，與原邏輯相同)
-    // ...
-
-    // 6. 同步任務與章節 (注入登場角色連結)
-    console.log("正在同步任務系統 (注入登場角色)...");
-    const factionDirMap = { 'royal': 'royal', 'skydow': 'skydow', 'third': 'third' };
-    const seasonDirMap = { '第一部 - 曙光乍現': 'seasons1', '第二部 - 屠魔英雄': 'seasons2' };
-
+    // 同步任務與章節
     for (const row of chapterRows) {
         const [isDone, cCode, factionId, seasonStr, chapterName, intro, openCond] = row;
         const factionDir = factionDirMap[factionId];
@@ -134,19 +124,16 @@ async function syncAll() {
         });
         fs.writeFileSync(chapterFile, chapterContent);
 
-        // 更新詳情頁面：注入登場角色
         missions.forEach(m => {
             const detailFile = path.join(MISSION_DETAIL_DIR, `${m.name}.md`);
             const backPath = `../${factionDir}/${seasonDir}/${chapterName}.md`;
             
-            // 💡 獲取此任務的所有角色
             const chars = missionToChars.get(m.name) || [];
-            const charLinks = chars.map(c => `[${c.name}](<../../lore/characters/details/${c.name}.md>)`).join('、');
+            const charLinks = chars.map(c => `[${c}](<../../lore/characters/details/${c}.md>)`).join('、');
 
             let refBlock = "";
-            if (charLinks) refBlock += `- **登場角色**：${charLinks}\n`;
             if (m.refIdx) {
-                refBlock += String(m.refIdx).split(',').map(idx => {
+                refBlock = String(m.refIdx).split(',').map(idx => {
                     const ref = refTable[idx.trim()];
                     return ref ? `- [${ref.text}](${ref.url})` : null;
                 }).filter(n => n).join('\n');
@@ -157,11 +144,18 @@ async function syncAll() {
             if (m.fail) detailContent += `- **失敗條件**：${m.fail}\n`;
             detailContent += `- **任務地圖**：${m.missionMaps || "待補充"}\n`;
             if (m.open) detailContent += `\n::: info 開啟條件\n${m.open}\n:::\n`;
-            detailContent += `\n## 詳細資訊\n\n${formatText(m.detail) || "(待補充)"}\n\n## 參考資料\n- [《光暈戰記》官方遊戲](${OFFICIAL_URL})\n${refBlock}\n`;
+            detailContent += `\n## 詳細資訊\n\n${formatText(m.detail) || "(待補充)"}\n\n`;
+            
+            // 💡 修正位置：登場角色獨立區塊，在參考資料上方
+            if (charLinks) {
+                detailContent += `## 登場角色\n${charLinks}\n\n`;
+            }
+            
+            detailContent += `## 參考資料\n- [《光暈戰記》官方遊戲](${OFFICIAL_URL})\n${refBlock}\n`;
             fs.writeFileSync(detailFile, detailContent);
         });
     }
-    console.log("✅ 全系統圖形關聯同步完成。");
+    console.log("✅ 任務詳情頁格式修正完成 (登場角色已獨立)。");
 }
 
 syncAll().catch(console.error);
