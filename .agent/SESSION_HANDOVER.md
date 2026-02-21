@@ -1,7 +1,7 @@
 # 📝 希雅的階段性交接筆記 (Session Handover)
 
 **日期**: 2026-02-22  
-**核心狀態**: 全系統資料庫化完成、腳本大一統。
+**核心狀態**: 全系統資料庫化完成、腳本技能化重構。
 
 ---
 
@@ -16,16 +16,24 @@
 
 ---
 
-## 🛠️ 維護指令 (TMC v5.0)
-為了保持代碼純度，**嚴禁修改 `scripts/tmc.js` 內容**。
+## 🛠️ 技能化維護系統 (Skills Tree)
+為了保持代碼秩序，所有腳本已封裝於 `skills/` 目錄。詳細的工具說明請參閱 `skills/MAP.md`。
 
-### 🔄 全量同步
-當試算表資料更新後，執行以下唯一指令即可將變更推送到全 Wiki 檔案：
+### 🔄 全量同步 (Wiki Sync)
+當試算表資料更新後，執行以下指令將變更推送到全 Wiki 檔案：
 ```bash
-node scripts/tmc.js sync
+node skills/wiki/sync/script.js sync
 ```
 
-詳細的工具用法（如單一角色查詢與更新）請參閱 `scripts/TOOL_GUIDE.md`。💋
+### 🔍 角色查詢 (Get Character)
+```bash
+node skills/characters/get/script.js "角色名稱"
+```
+
+### ✍️ 角色更新 (Update Character)
+```bash
+node skills/characters/update/script.js "角色名稱" "欄位標題" "內容"
+```
 
 ---
 
@@ -33,7 +41,7 @@ node scripts/tmc.js sync
 1. **寧可漏缺，不可腦補**：未經考據的欄位一律留空或標註「待補充」。
 2. **格式隔離**：
    - **試算表**：文字應保持「行首無空格」與「段落間雙換行」。
-   - **Markdown**：由 `tmc.js` 生成，嚴禁手動編輯 `details/` 下的檔案。
+   - **Markdown**：由技能腳本生成，嚴禁手動編輯 `details/` 下的檔案。
 3. **路徑中文化**：章節與任務詳情頁的檔名必須使用中文，以維持網址可讀性。
 4. **Emoji 禁令**：Markdown 原始碼與正式回覆中嚴禁使用 Emoji 符號。
 
