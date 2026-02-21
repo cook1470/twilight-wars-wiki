@@ -76,10 +76,11 @@ async function syncMissions(sheets) {
     console.log("正在同步任務系統...");
     const mapsData = JSON.parse(fs.readFileSync(MAPS_DATA_PATH, 'utf8'));
     const mapTable = Object.fromEntries(mapsData.map(m => [m.id, m.name]));
-    
+    const refRes = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: '參考資料庫!A2:D10' });
+    const refTable = Object.fromEntries((refRes.data.values || []).map(r => [r[0], { text: r[2], url: r[3] }]));
+
     const chapterRes = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: '章節資訊!A2:G100' });
     const missionRes = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: '任務資訊!A2:L300' });
-    
     const chapterRows = chapterRes.data.values || [];
     const missionRows = missionRes.data.values || [];
 
@@ -90,9 +91,7 @@ async function syncMissions(sheets) {
         if (!missionsInChapter.has(chapterCode)) missionsInChapter.set(chapterCode, []);
         const mapIds = (row[10] || "").split(',').map(id => id.trim()).filter(id => id);
         const missionMaps = mapIds.map(id => mapTable[id] || id).join('、');
-        missionsInChapter.get(chapterCode).push({
-            name: row[4], description: row[5], open: row[6], win: row[7], fail: row[8], detail: row[9], refIdx: row[11], missionMaps
-        });
+        missionsInChapter.get(chapterCode).push({ name: row[4], description: row[5], open: row[6], win: row[7], fail: row[8], detail: row[9], refIdx: row[11], missionMaps });
     });
 
     const factionDirMap = { 'royal': 'royal', 'skydow': 'skydow', 'third': 'third' };
@@ -106,7 +105,6 @@ async function syncMissions(sheets) {
 
         const chapterFile = path.join(MISSION_BASE_DIR, factionDir, seasonDir, `${chapterName}.md`);
         const missions = missionsInChapter.get(cCode) || [];
-        
         let chapterContent = `## ${chapterName}\n\n${formatText(intro) || "(待補充)"}\n\n`;
         if (openCond) chapterContent += `::: info 開啟條件\n${openCond.trim()}\n:::\n\n`;
         chapterContent += `---\n\n`;
@@ -120,6 +118,7 @@ async function syncMissions(sheets) {
 
         missions.forEach(m => {
             const detailFile = path.join(DETAIL_DIR, `${m.name}.md`);
+            const backPath = `../${factionDir}/${seasonDir}/${chapterName}.md`;
             let refBlock = "(待補充)";
             if (m.refIdx) {
                 refBlock = String(m.refIdx).split(',').map(idx => {
@@ -127,7 +126,7 @@ async function syncMissions(sheets) {
                     return ref ? `- [${ref.text}](${ref.url})` : null;
                 }).filter(n => n).join('\n');
             }
-            let detailContent = `---\nmission_name: ${m.name}\nfaction: ${factionId}\n---\n\n# ${m.name}\n\n[回到章節：${chapterName}](<../${factionDir}/${seasonDir}/${chapterName}.md>)\n\n${formatText(m.description) || "(待補充)"}\n\n`;
+            let detailContent = `---\nmission_name: ${m.name}\nfaction: ${factionId}\n---\n\n# ${m.name}\n\n[回到章節：${chapterName}](<${backPath}>)\n\n${formatText(m.description) || "(待補充)"}\n\n`;
             if (m.win) detailContent += `- **過關條件**：${m.win}\n`;
             if (m.fail) detailContent += `- **失敗條件**：${m.fail}\n`;
             detailContent += `- **任務地圖**：${m.missionMaps || "待補充"}\n`;
