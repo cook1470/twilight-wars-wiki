@@ -3,24 +3,29 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * 💋 THEA'S UNIFIED COMMAND CENTER (TMC v5.0)
- * 「試算表即真理，代碼即秩序。」
+ * 💋 THEA'S UNIFIED SYNC ENGINE v17.0 (Skills Edition)
  */
 
+const MISSION_BASE_DIR = path.join(__dirname, '../../../docs/missions');
+const DETAIL_DIR = path.join(MISSION_BASE_DIR, 'details');
+const CREDS_PATH = path.join(__dirname, '../../../credentials/google-sheets.json');
 const SPREADSHEET_ID = '1kRPdI6caisjZuHJGmCjB3kHBveR2RVAeTJoyCmqOZVs';
-const CREDS_PATH = path.join(__dirname, '../credentials/google-sheets.json');
-const WIKI_DIR = path.join(__dirname, '../docs/lore/characters/details');
-const MISSION_DIR = path.join(__dirname, '../docs/missions');
-const DETAIL_DIR = path.join(MISSION_DIR, 'details');
-const MAPS_DATA_PATH = path.join(__dirname, '../docs/world/maps_data.json');
+const MAPS_DATA_PATH = path.join(__dirname, '../../../docs/world/maps_data.json');
 const OFFICIAL_URL = "https://twilightwars.gamelet.online/";
+
+const formatText = (text) => {
+    if (!text) return "";
+    return text.split('\n')
+        .map(line => line.trim())
+        .filter(line => line !== "")
+        .join('\n\n'); 
+};
 
 async function getSheetsClient() {
     const auth = new google.auth.GoogleAuth({ keyFile: CREDS_PATH, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
     return google.sheets({ version: 'v4', auth: await auth.getClient() });
 }
 
-// 輔助：判定是否為雜兵 (用於索引分組)
 function isGeneric(name) {
     const core = ['哈斯卡大帝', '阿薩斯', '雅堤米絲', '阿波羅', '魏斯蒙少尉', '亞拜爾上校', '影娘', '伊拉馬長老', '教主', '青嵩散人', '隱居士', '蕭居士', '腦洞主', '不動佛', '克萊德騎士'];
     if (core.some(c => name.includes(c))) return false;
@@ -28,7 +33,6 @@ function isGeneric(name) {
     return genericKeywords.some(kw => name.includes(kw));
 }
 
-// 1. 同步角色 Markdown
 async function syncCharacters(sheets) {
     console.log("正在同步角色系統...");
     const res = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: '角色資訊!A2:K500' });
@@ -41,17 +45,16 @@ async function syncCharacters(sheets) {
         const [isDone, id, faction, nameZh, nameEn, species, brief, background, missionsStr, refIndices] = row;
         if (!nameZh) return;
         const displayTitle = nameEn ? `${nameZh} (${nameEn})` : nameZh;
-        let refBlock = refIndices ? refIndices.split(',').map(idx => {
+        let refBlock = refIndices ? String(refIndices).split(',').map(idx => {
             const ref = refTable[idx.trim()];
             return ref ? `- [${ref.text}](${ref.url})` : null;
         }).filter(n => n).join('\n') : "(待補充)";
 
         const content = `---\nid: ${id || nameZh}\nname_zh: ${nameZh}\nname_en: ${nameEn || ""}\nfaction: ${faction || ""}\nspecies: ${species || ""}\nbrief: ${brief || ""}\n---\n\n# ${displayTitle}\n\n${brief || "(待補充)"}\n\n## 背景資訊\n\n${background || "(待補充)"}\n\n## 登場任務\n${missionsStr || "(尚未有經查證的登場紀錄)"}\n\n## 參考資料\n${refBlock}\n`;
-        fs.writeFileSync(path.join(WIKI_DIR, `${nameZh}.md`), content);
+        fs.writeFileSync(path.join(__dirname, '../../../docs/lore/characters/details', `${nameZh}.md`), content);
         characters.push({ id: nameZh, name: nameZh, faction, brief });
     });
 
-    // 重建索引頁
     console.log("正在重建角色索引頁...");
     const factionFiles = { '天影十字軍': 'skydow-warriors.md', '皇家騎士團': 'royal-knights.md', '第三勢力': 'third-force.md', '中立勢力': 'neutral.md', '其他': 'others.md' };
     Object.entries(factionFiles).forEach(([fac, fileName]) => {
@@ -59,26 +62,24 @@ async function syncCharacters(sheets) {
         let fileContent = `# ${fac} 人物誌\n\n`;
         const named = list.filter(c => !isGeneric(c.name));
         const generic = list.filter(c => isGeneric(c.name));
-        
         fileContent += `## 具名角色 / 核心英雄\n\n`;
         if (named.length) named.forEach(c => fileContent += `- [**${c.name}**](<./details/${c.id}.md>) - ${c.brief}\n`);
         else fileContent += `(暫無資料)\n`;
-        
         fileContent += `\n## 職位 / 雜兵 / 生物\n\n`;
         if (generic.length) generic.forEach(c => fileContent += `- [${c.name}](<./details/${c.id}.md>) - ${c.brief}\n`);
         else fileContent += `(暫無資料)\n`;
-        
-        fs.writeFileSync(path.join(__dirname, '../docs/lore/characters', fileName), fileContent);
+        fs.writeFileSync(path.join(__dirname, '../../../docs/lore/characters', fileName), fileContent);
     });
 }
 
-// 2. 同步任務 Markdown
 async function syncMissions(sheets) {
     console.log("正在同步任務系統...");
     const mapsData = JSON.parse(fs.readFileSync(MAPS_DATA_PATH, 'utf8'));
     const mapTable = Object.fromEntries(mapsData.map(m => [m.id, m.name]));
+    
     const chapterRes = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: '章節資訊!A2:G100' });
     const missionRes = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: '任務資訊!A2:L300' });
+    
     const chapterRows = chapterRes.data.values || [];
     const missionRows = missionRes.data.values || [];
 
@@ -89,7 +90,9 @@ async function syncMissions(sheets) {
         if (!missionsInChapter.has(chapterCode)) missionsInChapter.set(chapterCode, []);
         const mapIds = (row[10] || "").split(',').map(id => id.trim()).filter(id => id);
         const missionMaps = mapIds.map(id => mapTable[id] || id).join('、');
-        missionsInChapter.get(chapterCode).push({ name: row[4], description: row[5], open: row[6], win: row[7], fail: row[8], detail: row[9], refIdx: row[11], missionMaps });
+        missionsInChapter.get(chapterCode).push({
+            name: row[4], description: row[5], open: row[6], win: row[7], fail: row[8], detail: row[9], refIdx: row[11], missionMaps
+        });
     });
 
     const factionDirMap = { 'royal': 'royal', 'skydow': 'skydow', 'third': 'third' };
@@ -101,13 +104,14 @@ async function syncMissions(sheets) {
         const seasonDir = seasonDirMap[seasonStr];
         if (!factionDir || !seasonDir || !chapterName) continue;
 
-        const chapterFile = path.join(MISSION_DIR, factionDir, seasonDir, `${chapterName}.md`);
+        const chapterFile = path.join(MISSION_BASE_DIR, factionDir, seasonDir, `${chapterName}.md`);
         const missions = missionsInChapter.get(cCode) || [];
-        let chapterContent = `## ${chapterName}\n\n${intro || "(待補充)"}\n\n`;
+        
+        let chapterContent = `## ${chapterName}\n\n${formatText(intro) || "(待補充)"}\n\n`;
         if (openCond) chapterContent += `::: info 開啟條件\n${openCond.trim()}\n:::\n\n`;
         chapterContent += `---\n\n`;
         missions.forEach(m => {
-            chapterContent += `### [${m.name}](<../../details/${m.name}.md>)\n${m.description || ""}\n\n`;
+            chapterContent += `### [${m.name}](<../../details/${m.name}.md>)\n${formatText(m.description)}\n\n`;
             if (m.win) chapterContent += `- **過關條件**：${m.win}\n`;
             if (m.fail) chapterContent += `- **失敗條件**：${m.fail}\n`;
             chapterContent += `\n`;
@@ -116,12 +120,19 @@ async function syncMissions(sheets) {
 
         missions.forEach(m => {
             const detailFile = path.join(DETAIL_DIR, `${m.name}.md`);
-            let detailContent = `---\nmission_name: ${m.name}\nfaction: ${factionId}\n---\n\n# ${m.name}\n\n[回到章節：${chapterName}](<../${factionDir}/${seasonDir}/${chapterName}.md>)\n\n${m.description || "(待補充)"}\n\n`;
+            let refBlock = "(待補充)";
+            if (m.refIdx) {
+                refBlock = String(m.refIdx).split(',').map(idx => {
+                    const ref = refTable[idx.trim()];
+                    return ref ? `- [${ref.text}](${ref.url})` : null;
+                }).filter(n => n).join('\n');
+            }
+            let detailContent = `---\nmission_name: ${m.name}\nfaction: ${factionId}\n---\n\n# ${m.name}\n\n[回到章節：${chapterName}](<../${factionDir}/${seasonDir}/${chapterName}.md>)\n\n${formatText(m.description) || "(待補充)"}\n\n`;
             if (m.win) detailContent += `- **過關條件**：${m.win}\n`;
             if (m.fail) detailContent += `- **失敗條件**：${m.fail}\n`;
             detailContent += `- **任務地圖**：${m.missionMaps || "待補充"}\n`;
             if (m.open) detailContent += `\n::: info 開啟條件\n${m.open}\n:::\n`;
-            detailContent += `\n## 詳細資訊\n\n${m.detail || "(待補充)"}\n\n## 參考資料\n- [《光暈戰記》官方遊戲](${OFFICIAL_URL})\n`;
+            detailContent += `\n## 詳細資訊\n\n${formatText(m.detail) || "(待補充)"}\n\n## 參考資料\n- [《光暈戰記》官方遊戲](${OFFICIAL_URL})\n${refBlock}\n`;
             fs.writeFileSync(detailFile, detailContent);
         });
     }
@@ -130,12 +141,14 @@ async function syncMissions(sheets) {
 async function main() {
     const cmd = process.argv[2];
     const sheets = await getSheetsClient();
+
     if (cmd === 'sync') {
         await syncCharacters(sheets);
         await syncMissions(sheets);
         console.log("✅ 全系統同步完成。");
     } else {
-        console.log("使用方式: node scripts/thea.js sync");
+        console.log("使用方式: node skills/wiki/sync/script.js sync");
     }
 }
+
 main().catch(console.error);

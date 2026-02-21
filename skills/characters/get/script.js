@@ -2,7 +2,7 @@ const { google } = require('googleapis');
 const path = require('path');
 
 const SPREADSHEET_ID = '1kRPdI6caisjZuHJGmCjB3kHBveR2RVAeTJoyCmqOZVs';
-const CREDS_PATH = path.join(__dirname, '../credentials/google-sheets.json');
+const CREDS_PATH = path.join(__dirname, '../../../credentials/google-sheets.json');
 
 async function getSheetsClient() {
     const auth = new google.auth.GoogleAuth({ keyFile: CREDS_PATH, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
@@ -11,7 +11,7 @@ async function getSheetsClient() {
 
 async function getCharacter(targetName) {
     if (!targetName) {
-        console.log("請提供角色中文名稱。用法: node scripts/get-char.js [角色名稱]");
+        console.log("用法: node skills/characters/get/script.js \"角色名稱\"");
         return;
     }
 
@@ -25,14 +25,13 @@ async function getCharacter(targetName) {
     if (!rows) return;
 
     const headers = rows[0];
-    const charRow = rows.find(row => row[3] === targetName); // 中文名稱在 D 欄 (Index 3)
+    const charRow = rows.find(row => row[3] === targetName);
 
     if (!charRow) {
         console.log(`找不到角色: ${targetName}`);
         return;
     }
 
-    console.log(`=== 角色資料: ${targetName} ===`);
     headers.forEach((header, index) => {
         console.log(`${header}: ${charRow[index] || ""}`);
     });
