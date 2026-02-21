@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * 💋 THEA'S UNIFIED SYNC ENGINE v18.0 (Smart Link Injection)
+ * 💋 THEA'S UNIFIED SYNC ENGINE v18.1 (Fixed)
  */
 
 const SPREADSHEET_ID = '1kRPdI6caisjZuHJGmCjB3kHBveR2RVAeTJoyCmqOZVs';
@@ -11,6 +11,7 @@ const CREDS_PATH = path.join(__dirname, '../../../credentials/google-sheets.json
 const CHAR_DETAIL_DIR = path.join(__dirname, '../../../docs/lore/characters/details');
 const MISSION_DIR = path.join(__dirname, '../../../docs/missions');
 const MISSION_DETAIL_DIR = path.join(MISSION_DIR, 'details');
+const MAPS_DATA_PATH = path.join(__dirname, '../../../docs/world/maps_data.json');
 const OFFICIAL_URL = "https://twilightwars.gamelet.online/";
 
 async function getSheetsClient() {
@@ -33,15 +34,11 @@ const formatText = (text) => {
         .join('\n\n'); 
 };
 
-// 輔助：自動將純文字任務名稱轉為 Markdown 連結
 const linkifyMissions = (missionsStr) => {
     if (!missionsStr || missionsStr.trim() === "" || missionsStr.includes("(尚未有經查證")) return "(尚未有經查證的登場紀錄)";
-    
     return missionsStr.split(/[、,，\n]/).map(m => {
         const name = m.trim();
         if (!name) return null;
-        // 角色百科在 docs/lore/characters/details/ 任務詳情在 docs/missions/details/
-        // 相對路徑需要跳出三層：../../../missions/details/
         return `[${name}](<../../../missions/details/${name}.md>)`;
     }).filter(n => n).join('、');
 };
@@ -72,10 +69,9 @@ async function syncCharacters(sheets) {
     const factionFiles = { '天影十字軍': 'skydow-warriors.md', '皇家騎士團': 'royal-knights.md', '第三勢力': 'third-force.md', '中立勢力': 'neutral.md', '其他': 'others.md' };
     Object.entries(factionFiles).forEach(([fac, fileName]) => {
         const list = characters.filter(c => c.faction === fac);
-        let fileContent = `# ${fac} 人物誌\n\n`;
+        let fileContent = `# ${fac} 人物誌\n\n## 具名角色 / 核心英雄\n\n`;
         const named = list.filter(c => !isGeneric(c.name));
         const generic = list.filter(c => isGeneric(c.name));
-        fileContent += `## 具名角色 / 核心英雄\n\n`;
         if (named.length) named.forEach(c => fileContent += `- [**${c.name}**](<./details/${c.id}.md>) - ${c.brief}\n`);
         else fileContent += `(暫無資料)\n`;
         fileContent += `\n## 職位 / 雜兵 / 生物\n\n`;
