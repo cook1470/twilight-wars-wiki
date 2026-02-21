@@ -30,10 +30,9 @@ node skills/wiki/sync/script.js sync
 node skills/characters/get/script.js "角色名稱"
 ```
 
-### ✍️ 角色更新 (Update Character)
-```bash
-node skills/characters/update/script.js "角色名稱" "欄位標題" "內容"
-```
+### ✍️ 角色重建 SOP
+重建角色資料時，必須嚴格遵守以下協議：
+- [角色資料重建協議](<./CHARACTER_RECONSTRUCTION_PROTOCOL.md>)
 
 ---
 
