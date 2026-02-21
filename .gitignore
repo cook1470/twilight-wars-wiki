@@ -1,0 +1,12 @@
+node_modules
+.temp
+.cache
+.vitepress/dist
+.vitepress/cache
+.DS_Store
+
+# Credentials
+credentials/
+*.json
+!package.json
+!package-lock.json

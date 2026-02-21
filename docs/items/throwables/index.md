@@ -1,0 +1,31 @@
+# 💣 投擲物與陷阱 (Throwables)
+
+本頁面列出所有相關物件清單。
+
+---
+
+- [骰子](./dice)
+- [骰子2](./dice2)
+- [電競籃球](./esBall)
+- [電競籃球1](./esBall1)
+- [電競籃球2](./esBall2)
+- [煙火（黑）](./fireworkBlack)
+- [煙火（藍）](./fireworkBlue)
+- [煙火（綠）](./fireworkGreen)
+- [煙火（靛）](./fireworkIndigo)
+- [煙火（橘）](./fireworkOrange)
+- [煙火（紫）](./fireworkPurple)
+- [煙火（彩虹）](./fireworkRainbow)
+- [煙火（紅）](./fireworkRed)
+- [煙火（白）](./fireworkWhite)
+- [煙火（黃）](./fireworkYellow)
+- [迴旋鏢](./frisbee)
+- [手榴彈](./grenadeBomb)
+- [燃燒手榴彈](./grenadeFire)
+- [煙霧彈](./grenadeSmoke)
+- [閃光彈](./grenadeStun)
+- [電磁斧](./hatchet)
+- [煙火轉蛋包](./packFireworks)
+- [手裏劍](./shuriken)
+- [手裏劍](./shurikens)
+- [定時炸彈](./timeBomb)
