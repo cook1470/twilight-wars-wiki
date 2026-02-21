@@ -2,10 +2,7 @@ const { google } = require('googleapis');
 const path = require('path');
 
 /**
- * THEA'S DATABASE CLEANER v2.0
- * 1. 移除所有行首空格與多餘換行。
- * 2. 徹底清空所有的 "(待補充)" 佔位符。
- * 3. 涵蓋 角色、任務、章節 所有核心分頁。
+ * THEA'S DATABASE CLEANER v2.1 (Checkbox Safe)
  */
 
 const CREDS_PATH = path.join(__dirname, '../../../credentials/google-sheets.json');
@@ -28,21 +25,22 @@ async function cleanAllSheets() {
         if (!rows) continue;
 
         const cleanedRows = rows.map((row, idx) => {
-            if (idx === 0) return row; // 跳過標題
-            return row.map(cell => {
+            if (idx === 0) return row;
+            return row.map((cell, colIdx) => {
+                // 💡 針對第一欄 (紀錄完成) 進行特殊布林轉換，避免變成字串
+                if (colIdx === 0) {
+                    const val = String(cell).trim().toUpperCase();
+                    return (val === 'TRUE');
+                }
+
                 if (typeof cell !== 'string') return cell;
-                
-                // 1. 移除 "(待補充)"
                 let cleaned = cell.replace(/\(待補充\)/g, '').trim();
-                
-                // 2. 格式清理 (移除行首空格，雙換行分段)
                 if (cleaned) {
                     cleaned = cleaned.split('\n')
                         .map(line => line.replace(/^[ 　]+/g, '').trim())
                         .filter(line => line !== "")
                         .join('\n\n');
                 }
-                
                 return cleaned;
             });
         });
@@ -50,11 +48,11 @@ async function cleanAllSheets() {
         await sheets.spreadsheets.values.update({
             spreadsheetId: SPREADSHEET_ID, 
             range: `${name}!A1`,
-            valueInputOption: 'RAW', 
+            valueInputOption: 'USER_ENTERED', // 💡 改用 USER_ENTERED 確保布林值生效
             resource: { values: cleanedRows }
         });
     }
-    console.log("✅ 試算表所有「(待補充)」佔位符已清空，格式已純淨化。");
+    console.log("✅ 試算表清理完成，複選框已受保護。");
 }
 
 cleanAllSheets().catch(console.error);
