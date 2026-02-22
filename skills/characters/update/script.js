@@ -3,9 +3,12 @@ const path = require('path');
 const fs = require('fs');
 
 /**
- * 💋 THEA'S SURGICAL UPDATE ENGINE v2.0 (File Injection Edition)
+ * 💋 THEA'S SURGICAL UPDATE ENGINE v2.1 (Header-Aware Edition)
  * 功能：更新試算表指定角色資料。
- * 特色：支援從外部檔案讀取 Markdown 內容進行注入。
+ * 特色：
+ * 1. 支援從外部檔案讀取 Markdown 內容 (@path)。
+ * 2. 自動對齊 Header 標題，不再依賴固定索引。
+ * 3. 支援 ID 或 中文名稱 雙重匹配。
  */
 
 const SPREADSHEET_ID = '1kRPdI6caisjZuHJGmCjB3kHBveR2RVAeTJoyCmqOZVs';
@@ -22,16 +25,13 @@ async function updateCharacter() {
     let newValue = process.argv[4];
 
     if (!targetName || !columnHeader || newValue === undefined) {
-        console.log('用法 (直接字串): node skills/characters/update/script.js "角色名稱" "欄位標題" "新內容"');
-        console.log('用法 (注入檔案): node skills/characters/update/script.js "角色名稱" "欄位標題" "@path/to/file.md"');
+        console.log('用法: node skills/characters/update/script.js "角色名稱" "欄位標題" "新內容"');
         return;
     }
 
-    // 💡 支援未來希雅：如果內容以 @ 開頭，則視為路徑並讀取檔案
     if (newValue.startsWith('@')) {
         const filePath = path.resolve(process.cwd(), newValue.substring(1));
         if (fs.existsSync(filePath)) {
-            console.log(`正在從檔案讀取內容：${filePath}`);
             newValue = fs.readFileSync(filePath, 'utf8').trim();
         } else {
             console.error(`錯誤：找不到指定檔案 ${filePath}`);
@@ -41,7 +41,7 @@ async function updateCharacter() {
 
     const sheets = await getSheetsClient();
     const res = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID, range: '角色資訊!A1:K500'
+        spreadsheetId: SPREADSHEET_ID, range: '角色資訊!A1:L500'
     });
 
     const rows = res.data.values;
@@ -50,13 +50,21 @@ async function updateCharacter() {
     const headers = rows[0];
     const columnIndex = headers.indexOf(columnHeader);
     if (columnIndex === -1) {
-        console.log(`錯誤: 找不到欄位「${columnHeader}」`);
+        console.error(`錯誤: 找不到欄位「${columnHeader}」。可用欄位：${headers.join(', ')}`);
         return;
     }
 
-    const rowIndex = rows.findIndex(row => row[3] === targetName);
+    // 尋找 ID 欄位與 中文名稱 欄位的索引
+    const idIndex = headers.indexOf('ID');
+    const nameIndex = headers.indexOf('中文名稱');
+
+    const rowIndex = rows.findIndex(row => 
+        (idIndex !== -1 && row[idIndex] === targetName) || 
+        (nameIndex !== -1 && row[nameIndex] === targetName)
+    );
+
     if (rowIndex === -1) {
-        console.log(`錯誤: 找不到角色「${targetName}」`);
+        console.error(`錯誤: 找不到角色「${targetName}」`);
         return;
     }
 
@@ -70,7 +78,7 @@ async function updateCharacter() {
         resource: { values: [[newValue]] }
     });
 
-    console.log(`成功更新「${targetName}」的「${columnHeader}」。`);
+    console.log(`✅ 成功更新「${targetName}」的「${columnHeader}」。`);
 }
 
 updateCharacter().catch(console.error);

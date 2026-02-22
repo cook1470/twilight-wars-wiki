@@ -25,7 +25,7 @@ async function getCharacter(targetName) {
     if (!rows) return;
 
     const headers = rows[0];
-    const charRow = rows.find(row => row[3] === targetName);
+    const charRow = rows.find(row => row[4] === targetName || row[1] === targetName);
 
     if (!charRow) {
         console.log(`找不到角色: ${targetName}`);
