@@ -3,9 +3,9 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * 💋 THEA'S UNIFIED SYNC ENGINE v20.0 (Category 真理化)
- * 1. 同步邏輯完全依照試算表「分類」欄位進行索引分組。
- * 2. 徹底移除代碼中的硬編碼分類邏輯。
+ * 💋 THEA'S UNIFIED SYNC ENGINE v21.2 (路徑絕對化修正)
+ * 1. 同步邏輯依照試算表「陣營 > 部 > 章節」進行目錄分級。
+ * 2. 跨檔案連結採用絕對路徑 (相對於 Wiki 根目錄)，解決 Base URL 偏移問題。
  */
 
 const SPREADSHEET_ID = '1kRPdI6caisjZuHJGmCjB3kHBveR2RVAeTJoyCmqOZVs';
@@ -24,16 +24,18 @@ async function getSheetsClient() {
 
 const formatText = (text) => text ? text.trim().split('\n').map(line => line.trim()).filter(l => l).join('\n\n') : "";
 
-const linkifyMissionsForChar = (missionsStr) => {
+const linkifyMissionsForChar = (missionsStr, missionPathMap) => {
     if (!missionsStr || missionsStr.trim() === "" || missionsStr.includes("(尚未有經查證")) return "(尚未有經查證的登場紀錄)";
     return missionsStr.split(/[、,，\n]/).map(m => {
         const name = m.trim();
-        return name ? `[${name}](<../../../missions/details/${name}.md>)` : null;
+        const absPath = missionPathMap ? missionPathMap.get(name) : null;
+        // 採用相對於 Wiki 根目錄的絕對路徑
+        return name ? (absPath ? `[${name}](<${absPath}>)` : `[${name}](<../../missions/details/${name}.md>)`) : null;
     }).filter(n => n).join('、');
 };
 
 async function syncAll() {
-    console.log("🚀 啟動全系統同步 (v20.0 - 分類真理化)...");
+    console.log("🚀 啟動全系統同步 (v21.2 - 路徑絕對化修正)...");
     const sheets = await getSheetsClient();
 
     const mapsData = JSON.parse(fs.readFileSync(MAPS_DATA_PATH, 'utf8'));
@@ -51,33 +53,53 @@ async function syncAll() {
     const refTable = Object.fromEntries((refRes.data.values || []).map(r => [r[0], { text: r[2], url: r[3] }]));
 
     const missionToChars = new Map();
-    const factionToChars = {}; // 用於重建索引頁
+    const factionToChars = {}; 
+    const missionPathMap = new Map(); 
+
+    const factionDirMap = { 'royal': 'royal', 'skydow': 'skydow', 'third': 'third' };
+    const seasonDirMap = { '第一部 - 曙光乍現': 'seasons1', '第二部 - 屠魔英雄': 'seasons2' };
+
+    // --- 0. 預先掃描章節與任務建立路徑映射 ---
+    const chapterMeta = new Map();
+    chapterRows.forEach(row => {
+        const [isDone, cCode, factionId, seasonStr, chapterName] = row;
+        const fDir = factionDirMap[factionId];
+        const sDir = seasonDirMap[seasonStr];
+        if (fDir && sDir && chapterName) chapterMeta.set(cCode, { fDir, sDir, chapterName });
+    });
+
+    missionRows.forEach(row => {
+        const [isDone, mId, factionId, chapterCode, mName] = row;
+        const meta = chapterMeta.get(chapterCode);
+        if (meta && mName) {
+            // 使用相對於 Wiki 根目錄的絕對路徑 (/missions/...)
+            const absPath = `/missions/${meta.fDir}/${meta.sDir}/${meta.chapterName}/${mName}.md`;
+            missionPathMap.set(mName, absPath);
+        }
+    });
 
     // --- 1. 同步角色詳情與建立索引映射 ---
     charRows.forEach(row => {
         const [isDone, id, faction, category, nameZh, nameEn, species, brief, background, missionsStr, refIndices] = row;
         if (!nameZh) return;
 
-        // 建立 Mission -> Chars 映射 (登場角色功能)
         const missions = (missionsStr || "").split(/[、,，\n]/).map(m => m.trim()).filter(m => m);
         missions.forEach(mName => {
             if (!missionToChars.has(mName)) missionToChars.set(mName, []);
             missionToChars.get(mName).push(nameZh);
         });
 
-        // 建立 Faction -> Category -> Chars 映射 (索引頁功能)
         if (!factionToChars[faction]) factionToChars[faction] = { "核心英雄": [], "雜兵生物": [], "其他": [] };
         const catKey = category === "核心英雄" || category === "雜兵生物" ? category : "其他";
         factionToChars[faction][catKey].push({ id: nameZh, name: nameZh, brief: brief || "(待補充)" });
 
-        // 生成詳情頁 MD
         const displayTitle = nameEn ? `${nameZh} (${nameEn})` : nameZh;
         let refBlock = refIndices ? String(refIndices).split(',').map(idx => {
             const ref = refTable[idx.trim()];
             return ref ? `- [${ref.text}](${ref.url})` : null;
         }).filter(n => n).join('\n') : "(待補充)";
 
-        const content = `---\nid: ${id || nameZh}\nname_zh: ${nameZh}\nname_en: ${nameEn || ""}\nfaction: ${faction || ""}\nspecies: ${species || ""}\nbrief: ${brief || ""}\n---\n\n# ${displayTitle}\n\n${brief || "(待補充)"}\n\n## 背景資訊\n\n${formatText(background) || "(待補充)"}\n\n## 登場任務\n${linkifyMissionsForChar(missionsStr)}\n\n## 參考資料\n${refBlock}\n`;
+        const content = `---\nid: ${id || nameZh}\nname_zh: ${nameZh}\nname_en: ${nameEn || ""}\nfaction: ${faction || ""}\nspecies: ${species || ""}\nbrief: ${brief || ""}\n---\n\n# ${displayTitle}\n\n${brief || "(待補充)"}\n\n## 背景資訊\n\n${formatText(background) || "(待補充)"}\n\n## 登場任務\n${linkifyMissionsForChar(missionsStr, missionPathMap)}\n\n## 參考資料\n${refBlock}\n`;
         fs.writeFileSync(path.join(CHAR_DETAIL_DIR, `${nameZh}.md`), content);
     });
 
@@ -100,9 +122,8 @@ async function syncAll() {
         fs.writeFileSync(path.join(CHAR_INDEX_DIR, fileName), fileContent);
     });
 
-    // --- 3. 同步任務系統 (略，保持原有邏輯) ---
-    // ... [任務同步邏輯與之前 v19.1 一致，僅需確保引用位置正確] ...
-    console.log("正在同步任務系統...");
+    // --- 3. 同步任務系統 (結構層級化) ---
+    console.log("正在同步任務系統 (層級化)...");
     const missionsInChapter = new Map();
     missionRows.forEach(row => {
         const chapterCode = row[3];
@@ -112,43 +133,56 @@ async function syncAll() {
         const missionMaps = mapIds.map(id => mapTable[id] || id).join('、');
         missionsInChapter.get(chapterCode).push({ name: row[4], description: row[5], open: row[6], win: row[7], fail: row[8], detail: row[9], refIdx: row[11], missionMaps });
     });
-    const factionDirMap = { 'royal': 'royal', 'skydow': 'skydow', 'third': 'third' };
-    const seasonDirMap = { '第一部 - 曙光乍現': 'seasons1', '第二部 - 屠魔英雄': 'seasons2' };
+
     for (const row of chapterRows) {
         const [isDone, cCode, factionId, seasonStr, chapterName, intro, openCond] = row;
         const factionDir = factionDirMap[factionId];
         const seasonDir = seasonDirMap[seasonStr];
         if (!factionDir || !seasonDir || !chapterName) continue;
-        const chapterFile = path.join(MISSION_DIR, factionDir, seasonDir, `${chapterName}.md`);
+        
+        const chapterDir = path.join(MISSION_DIR, factionDir, seasonDir);
+        const missionSubDir = path.join(chapterDir, chapterName);
+        if (!fs.existsSync(missionSubDir)) fs.mkdirSync(missionSubDir, { recursive: true });
+
+        const chapterFile = path.join(chapterDir, `${chapterName}.md`);
         const missions = missionsInChapter.get(cCode) || [];
+        
         let chapterContent = `## ${chapterName}\n\n${formatText(intro) || "(待補充)"}\n\n`;
         if (openCond) chapterContent += `::: info 開啟條件\n${openCond.trim()}\n:::\n\n`;
         chapterContent += `---\n\n`;
+        
         missions.forEach(m => {
-            chapterContent += `### [${m.name}](<../../details/${m.name}.md>)\n${formatText(m.description)}\n\n`;
+            chapterContent += `### [${m.name}](<./${chapterName}/${m.name}.md>)\n${formatText(m.description)}\n\n`;
             if (m.win) chapterContent += `- **過關條件**：${m.win}\n`;
             if (m.fail) chapterContent += `- **失敗條件**：${m.fail}\n`;
             chapterContent += `\n`;
         });
         fs.writeFileSync(chapterFile, chapterContent);
+
         missions.forEach(m => {
-            const detailFile = path.join(MISSION_DETAIL_DIR, `${m.name}.md`);
-            const backPath = `../${factionDir}/${seasonDir}/${chapterName}.md`;
+            const detailFile = path.join(missionSubDir, `${m.name}.md`);
+            const backPath = `../${chapterName}.md`;
             const chars = missionToChars.get(m.name) || [];
-            const charLinks = chars.map(c => `[${c}](<../../lore/characters/details/${c}.md>)`).join('、');
+            
+            // 任務連向角色，一律採用 Wiki 根目錄絕對路徑 (/lore/...)
+            const charLinks = chars.map(c => `[${c}](</lore/characters/details/${c}.md>)`).join('、');
+            
             let refBlock = "";
             if (m.refIdx) refBlock = String(m.refIdx).split(',').map(idx => { const ref = refTable[idx.trim()]; return ref ? `- [${ref.text}](${ref.url})` : null; }).filter(n => n).join('\n');
+            
             let conditionsMd = "";
             if (m.win) conditionsMd += `- **過關條件**：${m.win}\n`;
             if (m.fail) conditionsMd += `- **失敗條件**：${m.fail}\n`;
             conditionsMd += `- **任務地圖**：${m.missionMaps || "待補充"}\n`;
+            
             let openBlock = m.open ? `\n::: info 開啟條件\n${m.open.trim()}\n:::\n` : "";
+            
             let detailContent = `---\nmission_name: ${m.name}\nfaction: ${factionId}\n---\n\n# ${m.name}\n\n[回到章節：${chapterName}](<${backPath}>)\n\n${formatText(m.description) || "(待補充)"}\n\n${conditionsMd}${openBlock}\n## 詳細資訊\n\n${formatText(m.detail) || "(待補充)"}\n\n## 登場角色\n${charLinks || "無"}\n\n## 參考資料\n- [《光暈戰記》官方遊戲](${OFFICIAL_URL})\n${refBlock}\n`;
             fs.writeFileSync(detailFile, detailContent);
         });
     }
 
-    console.log("✅ 全系統同步完成。");
+    console.log("✅ 全系統同步完成 (絕對路徑化已部署)。");
 }
 
 syncAll().catch(console.error);
