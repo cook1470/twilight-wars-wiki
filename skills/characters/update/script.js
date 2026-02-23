@@ -68,6 +68,12 @@ async function updateCharacter() {
         return;
     }
 
+    // --- 💋 THEA'S SURGICAL FORMATTING RULES ---
+    // 1. 強制確保「參考資料 (Index)」欄位為純字串，避免 Google Sheets 誤判為日期。
+    if (columnHeader === '參考資料 (Index)' && !newValue.startsWith("'")) {
+        newValue = "'" + newValue;
+    }
+
     const columnLetter = String.fromCharCode(65 + columnIndex);
     const range = `角色資訊!${columnLetter}${rowIndex + 1}`;
 

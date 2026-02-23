@@ -1,5 +1,12 @@
 # 其他 人物誌
 
+## 伊拉馬
+
+- [伊拉馬](</lore/characters/details/伊拉馬.md>) - 伊拉馬部落的長老，語言簡練，委託天影武士救回族人。
+- [伊拉馬戰士](</lore/characters/details/伊拉馬戰士.md>) - 隸屬於伊拉馬部落的守衛力量，守護著迷霧森林北方的領地。
+- [伊拉馬人質](</lore/characters/details/伊拉馬人質.md>) - 被困於迷霧森林中的伊拉馬部落成員，不具備武裝。
+- [伊芙](</lore/characters/details/伊芙.md>) - 伊拉馬族的少女，長老的親族。
+
 ## 雜兵生物
 
 - [下哨衛兵](</lore/characters/details/下哨衛兵.md>) - (待補充)
@@ -39,7 +46,6 @@
 - [囚犯](</lore/characters/details/囚犯.md>) - (待補充)
 - [天位騎士](</lore/characters/details/天位騎士.md>) - (待補充)
 - [娜妹軍](</lore/characters/details/娜妹軍.md>) - (待補充)
-- [小哈片刻](</lore/characters/details/小哈片刻.md>) - (待補充)
 - [巨型藍猩](</lore/characters/details/巨型藍猩.md>) - (待補充)
 - [火球](</lore/characters/details/火球.md>) - (待補充)
 - [火舍利](</lore/characters/details/火舍利.md>) - (待補充)
@@ -61,4 +67,9 @@
 - [黑炎軍相](</lore/characters/details/黑炎軍相.md>) - (待補充)
 - [黑炎軍砲](</lore/characters/details/黑炎軍砲.md>) - (待補充)
 - [黑炎軍馬](</lore/characters/details/黑炎軍馬.md>) - (待補充)
+
+## 最高領袖
+
+- [小哈片刻](</lore/characters/details/小哈片刻.md>) - Gamelet.Online 創辦人，光暈世界觀的「創世神」與哈斯卡大帝的現實原身。
+- [藍天白雲](</lore/characters/details/藍天白雲.md>) - 嘎姆擂台核心開發者，小哈片刻的長期合作夥伴。
 
